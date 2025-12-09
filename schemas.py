@@ -1,0 +1,178 @@
+"""
+Pydantic schemas for request validation and response serialization.
+
+This module defines all data models for API requests and responses with
+comprehensive field validation to ensure data integrity.
+"""
+
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Literal, Optional
+from datetime import datetime
+from enum import Enum
+
+
+# ============================================================================
+# Authentication Schemas
+# ============================================================================
+
+class TokenResponse(BaseModel):
+    """Response model for OAuth authentication containing JWT token."""
+    access_token: str = Field(..., description="JWT access token for authentication")
+    token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
+
+
+class UserResponse(BaseModel):
+    """Response model for user information."""
+    id: str = Field(..., description="Unique user identifier")
+    email: str = Field(..., description="User's email address from Google")
+    full_name: Optional[str] = Field(None, description="User's full name from Google profile")
+    
+    model_config = {"from_attributes": True}
+
+
+# ============================================================================
+# API Key Schemas
+# ============================================================================
+
+class ExpiryPeriod(str, Enum):
+    """Enum for API key expiry periods."""
+    ONE_HOUR = "1H"
+    ONE_DAY = "1D"
+    ONE_MONTH = "1M"
+    ONE_YEAR = "1Y"
+
+
+class PermissionType(str, Enum):
+    """Enum for API key permissions."""
+    DEPOSIT = "deposit"  # Can initialize deposits
+    TRANSFER = "transfer"  # Can transfer funds between wallets
+    READ = "read"  # Can read wallet balance and transactions
+
+
+class APIKeyCreateRequest(BaseModel):
+    """Request model for creating a new API key."""
+    name: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=100,
+        description="User-friendly name for the API key (e.g., 'Production Server')"
+    )
+    permissions: List[PermissionType] = Field(
+        ..., 
+        min_length=1,
+        description="List of permissions for this key (deposit, transfer, read)"
+    )
+    expiry: ExpiryPeriod = Field(
+        ...,
+        description="Expiry period for the key (1H, 1D, 1M, 1Y)"
+    )
+    
+    @field_validator('permissions')
+    @classmethod
+    def validate_no_duplicate_permissions(cls, v: List[PermissionType]) -> List[PermissionType]:
+        """Ensure no duplicate permissions in the list."""
+        if len(v) != len(set(v)):
+            raise ValueError("Duplicate permissions are not allowed")
+        return v
+
+
+class APIKeyResponse(BaseModel):
+    """Response model after creating an API key - contains the plain key (shown only once)."""
+    api_key: str = Field(..., description="The API key - SAVE THIS, it won't be shown again")
+    expires_at: datetime = Field(..., description="When this key will expire")
+
+
+class APIKeyRolloverRequest(BaseModel):
+    """Request model for rolling over an expired API key."""
+    expired_key_id: str = Field(..., description="ID of the expired key to rollover")
+    expiry: ExpiryPeriod = Field(..., description="Expiry period for the new key")
+
+
+# ============================================================================
+# Wallet Schemas
+# ============================================================================
+
+class WalletDepositRequest(BaseModel):
+    """Request model for initiating a deposit via Paystack."""
+    amount: float = Field(..., gt=0, description="Amount to deposit in Naira (must be positive)")
+    
+    @field_validator('amount')
+    @classmethod
+    def validate_amount_reasonable(cls, v: float) -> float:
+        """Ensure amount is reasonable (less than 1 million Naira = 100M kobo)."""
+        if v >= 1_000_000:
+            raise ValueError("Amount must be less than 1,000,000 Naira")
+        return v
+
+
+class WalletDepositResponse(BaseModel):
+    """Response model after initiating a deposit - contains Paystack payment URL."""
+    reference: str = Field(..., description="Unique transaction reference")
+    authorization_url: str = Field(..., description="Paystack URL to complete payment")
+
+
+class DepositStatusResponse(BaseModel):
+    """Response model for checking deposit status."""
+    reference: str = Field(..., description="Transaction reference")
+    status: Literal["success", "failed", "pending"] = Field(..., description="Current transaction status")
+    amount: float = Field(..., description="Transaction amount in Naira")
+
+
+class WalletBalanceResponse(BaseModel):
+    """Response model for wallet balance."""
+    balance: float = Field(..., description="Current wallet balance in Naira")
+
+
+class WalletTransferRequest(BaseModel):
+    """Request model for transferring funds between wallets."""
+    wallet_number: str = Field(
+        ..., 
+        min_length=13, 
+        max_length=13,
+        description="Recipient's 13-digit wallet number"
+    )
+    amount: float = Field(..., gt=0, description="Amount to transfer in Naira (must be positive)")
+    
+    @field_validator('wallet_number')
+    @classmethod
+    def validate_wallet_number_format(cls, v: str) -> str:
+        """Ensure wallet number is exactly 13 digits."""
+        if not v.isdigit():
+            raise ValueError("Wallet number must contain only digits")
+        if len(v) != 13:
+            raise ValueError("Wallet number must be exactly 13 digits")
+        return v
+    
+    @field_validator('amount')
+    @classmethod
+    def validate_transfer_amount(cls, v: float) -> float:
+        """Ensure transfer amount is positive and reasonable."""
+        if v <= 0:
+            raise ValueError("Transfer amount must be positive")
+        if v >= 1_000_000:
+            raise ValueError("Transfer amount must be less than 1,000,000 Naira")
+        return v
+
+
+class WalletTransferResponse(BaseModel):
+    """Response model after successful transfer."""
+    status: Literal["success"] = Field(default="success", description="Transfer status")
+    message: str = Field(..., description="Success message with transfer details")
+
+
+class TransactionResponse(BaseModel):
+    """Response model for transaction history."""
+    id: str = Field(..., description="Transaction ID")
+    type: str = Field(..., description="Transaction type (DEPOSIT, TRANSFER_IN, TRANSFER_OUT)")
+    amount: float = Field(..., description="Transaction amount in Naira")
+    status: str = Field(..., description="Transaction status (PENDING, SUCCESS, FAILED)")
+    reference: str = Field(..., description="Unique transaction reference")
+    recipient_wallet_number: Optional[str] = Field(None, description="Recipient wallet number (for transfers)")
+    created_at: datetime = Field(..., description="When the transaction was created")
+    
+    model_config = {"from_attributes": True}
+
+
+class WebhookResponse(BaseModel):
+    """Response model for webhook endpoint - always returns success."""
+    status: bool = Field(default=True, description="Webhook processing status")
