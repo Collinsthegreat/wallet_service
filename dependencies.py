@@ -231,33 +231,79 @@ def require_permission(required_permission: str) -> Callable:
         - API key users must have the specific permission in their key
     """
     async def permission_checker(
-        auth_data: Tuple[User, Optional[List[str]]] = Depends(get_authenticated_user)
+        credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+        x_api_key: Optional[str] = Header(None),  # include_in_schema removed
+        db: Session = Depends(get_db)
     ) -> User:
-        """
-        Check if the authenticated user has the required permission.
+        # Try JWT first
+        if credentials:
+            try:
+                payload = decode_access_token(credentials.credentials)
+                user_id = payload.get("sub")
+                
+                if not user_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or expired token"
+                    )
+                
+                user = db.query(User).filter(User.id == user_id).first()
+                if not user:
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Invalid or expired token"
+                    )
+                
+                # JWT users have all permissions
+                return user
+                
+            except HTTPException:
+                raise
         
-        Args:
-            auth_data: Tuple of (User, permissions) from authentication
-        
-        Returns:
-            User: The authenticated user object
-        
-        Raises:
-            HTTPException: 403 FORBIDDEN if permission missing
-        """
-        user, permissions = auth_data
-        
-        # JWT users have all permissions (permissions is None)
-        if permissions is None:
+        # Try API key
+        if x_api_key:
+            key_hash = hash_api_key(x_api_key)
+            api_key = db.query(APIKey).filter(APIKey.key_hash == key_hash).first()
+            
+            if not api_key:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid API key"
+                )
+            
+            if api_key.is_revoked:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API key has been revoked"
+                )
+            
+            if datetime.utcnow() > api_key.expires_at:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API key has expired"
+                )
+            
+            user = db.query(User).filter(User.id == api_key.user_id).first()
+            if not user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid API key"
+                )
+            
+            # Check permission for API key
+            permissions = json.loads(api_key.permissions)
+            if required_permission not in permissions:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"API key lacks required permission: {required_permission}"
+                )
+            
             return user
         
-        # API key users must have the specific permission
-        if required_permission not in permissions:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"API key lacks required permission: {required_permission}"
-            )
-        
-        return user
+        # Neither JWT nor API key provided
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Provide either JWT token or API key"
+        )
     
     return permission_checker
