@@ -48,9 +48,12 @@ class AuthResponse(BaseModel):
     """Complete authentication response with user data."""
     user: UserResponse = Field(..., description="User information")
     access_token: str = Field(..., description="JWT access token", alias="accessToken")
+    # Optional reverse alias (not required but helps)
+    accessToken: str = Field(..., alias="access_token")
     token_type: str = Field(default="bearer", description="Token type", alias="tokenType")
     
     model_config = {"populate_by_name": True}
+
 
 
 # ============================================================================
