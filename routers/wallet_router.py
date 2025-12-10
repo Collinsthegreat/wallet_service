@@ -47,7 +47,7 @@ async def initialize_deposit(
     User completes payment on Paystack, then webhook credits the wallet.
     
     Args:
-        request: Deposit request with amount in Naira
+        request: Deposit request with amount in kobo
         user: Authenticated user
         db: Database session
     
@@ -64,7 +64,7 @@ async def initialize_deposit(
         POST /wallet/deposit
         Authorization: Bearer eyJ... (or x-api-key: sk_live_...)
         {
-            "amount": 500.0
+            "amount": 50000
         }
         
     Example Response:
@@ -79,16 +79,13 @@ async def initialize_deposit(
     # Generate unique reference
     reference = f"DEP-{uuid.uuid4()}"
     
-    # Create pending transaction
+    # Create pending transaction (amount already in kobo)
     wallet_service.create_pending_deposit(db, wallet, request.amount, reference)
     
-    # Convert amount to kobo (Paystack uses smallest currency unit)
-    amount_in_kobo = int(request.amount * 100)
-    
-    # Initialize transaction with Paystack
+    # Initialize transaction with Paystack (amount already in kobo)
     paystack_response = await paystack_service.initialize_transaction(
         email=user.email,
-        amount=amount_in_kobo,
+        amount=request.amount,  # Already in kobo
         reference=reference
     )
     
@@ -172,15 +169,12 @@ async def paystack_webhook(
         status_str = data.get("status")
         amount_kobo = data.get("amount")
         
-        # Convert amount from kobo to naira
-        amount_naira = amount_kobo / 100 if amount_kobo else 0
-        
-        # Process the deposit (idempotent)
+        # Process the deposit (amount already in kobo - no conversion needed)
         wallet_service.process_webhook_deposit(
             db=db,
             reference=reference,
             status_str=status_str,
-            amount=amount_naira
+            amount=amount_kobo
         )
         
         return WebhookResponse(status=True)
@@ -258,6 +252,75 @@ def get_deposit_status(
     )
 
 
+@router.post("/deposit/{reference}/verify", response_model=DepositStatusResponse)
+async def verify_deposit(
+    reference: str,
+    user: User = Depends(require_permission("read")),
+    db: Session = Depends(get_db)
+):
+    """
+    Verify a deposit transaction with Paystack (MANUAL VERIFICATION ONLY).
+    
+    Requires "read" permission (JWT or API key with read permission).
+    
+    This endpoint queries Paystack directly to verify transaction status.
+    IMPORTANT: This is for manual verification only - does NOT credit wallet.
+    Only the webhook credits wallets.
+    
+    Args:
+        reference: Transaction reference (from deposit response)
+        user: Authenticated user
+        db: Database session
+    
+    Returns:
+        DepositStatusResponse: Transaction reference, status, and amount
+    
+    Raises:
+        HTTPException:
+            - 401/403: Authentication/authorization errors
+            - 404 NOT_FOUND: Transaction not found in Paystack
+            - 502 BAD_GATEWAY: Paystack API error
+            
+    Example Request:
+        POST /wallet/deposit/DEP-abc123/verify
+        Authorization: Bearer eyJ... (or x-api-key: sk_live_...)
+        
+    Example Response:
+        {
+            "reference": "DEP-abc123",
+            "status": "success",
+            "amount": 50000
+        }
+    """
+    # Get user's wallet
+    wallet = wallet_service.get_wallet(db, user)
+    
+    # Find transaction in local database
+    transaction = (
+        db.query(Transaction)
+        .filter(
+            Transaction.reference == reference,
+            Transaction.wallet_id == wallet.id
+        )
+        .first()
+    )
+    
+    if not transaction:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Transaction not found"
+        )
+    
+    # Verify with Paystack
+    paystack_data = await paystack_service.verify_transaction(reference)
+    
+    return DepositStatusResponse(
+        reference=reference,
+        status=paystack_data.get("status", "pending"),
+        amount=paystack_data.get("amount", 0)
+    )
+
+
 @router.get("/balance", response_model=WalletBalanceResponse)
 def get_balance(
     user: User = Depends(require_permission("read")),
@@ -322,19 +385,19 @@ def transfer_funds(
         Authorization: Bearer eyJ... (or x-api-key: sk_live_...)
         {
             "wallet_number": "1234567890123",
-            "amount": 100.0
+            "amount": 10000
         }
         
     Example Response:
         {
             "status": "success",
-            "message": "Successfully transferred 100.0 Naira to wallet 1234567890123"
+            "message": "Successfully transferred 10000 kobo to wallet 1234567890123"
         }
     """
     # Get sender's wallet
     sender_wallet = wallet_service.get_wallet(db, user)
     
-    # Perform transfer
+    # Perform transfer (amount already in kobo)
     wallet_service.transfer_funds(
         db=db,
         sender_wallet=sender_wallet,
@@ -344,7 +407,7 @@ def transfer_funds(
     
     return WalletTransferResponse(
         status="success",
-        message=f"Successfully transferred {request.amount} Naira to wallet {request.wallet_number}"
+        message=f"Successfully transferred {request.amount} kobo to wallet {request.wallet_number}"
     )
 
 
@@ -377,7 +440,7 @@ def get_transaction_history(
             {
                 "id": "txn-123",
                 "type": "DEPOSIT",
-                "amount": 500.0,
+                "amount": 50000,
                 "status": "SUCCESS",
                 "reference": "DEP-abc123",
                 "recipient_wallet_number": null,
@@ -386,7 +449,7 @@ def get_transaction_history(
             {
                 "id": "txn-456",
                 "type": "TRANSFER_OUT",
-                "amount": 100.0,
+                "amount": 10000,
                 "status": "SUCCESS",
                 "reference": "TRF-xyz789-OUT",
                 "recipient_wallet_number": "1234567890123",

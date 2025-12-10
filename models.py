@@ -10,7 +10,7 @@ This module defines all database tables and their relationships:
 
 import enum
 from datetime import datetime
-from sqlalchemy import Column, String, Float, DateTime, Boolean, ForeignKey, Enum as SQLEnum, Index
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, ForeignKey, Enum as SQLEnum, Index
 from sqlalchemy.orm import relationship
 from database import Base
 import uuid
@@ -79,8 +79,8 @@ class Wallet(Base):
     # 13-digit unique identifier for transfers between wallets
     wallet_number = Column(String(13), unique=True, nullable=False, index=True)
     
-    # Current balance in Naira - default 0.0, never NULL
-    balance = Column(Float, default=0.0, nullable=False)
+    # Current balance in kobo (smallest currency unit) - default 0, never NULL
+    balance = Column(Integer, default=0, nullable=False)
     
     # Timestamps for audit trail
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -116,8 +116,8 @@ class Transaction(Base):
     # Type of transaction (DEPOSIT, TRANSFER_IN, TRANSFER_OUT)
     type = Column(SQLEnum(TransactionType), nullable=False)
     
-    # Amount in Naira
-    amount = Column(Float, nullable=False)
+    # Amount in kobo (smallest currency unit)
+    amount = Column(Integer, nullable=False)
     
     # Current status of the transaction
     status = Column(SQLEnum(TransactionStatus), default=TransactionStatus.PENDING, nullable=False)

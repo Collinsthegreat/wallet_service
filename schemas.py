@@ -17,8 +17,20 @@ from enum import Enum
 
 class TokenResponse(BaseModel):
     """Response model for OAuth authentication containing JWT token."""
-    access_token: str = Field(..., description="JWT access token for authentication")
-    token_type: str = Field(default="bearer", description="Token type (always 'bearer')")
+    access_token: str = Field(..., description="JWT access token for authentication", alias="accessToken")
+    token_type: str = Field(default="bearer", description="Token type (always 'bearer')", alias="tokenType")
+    
+    model_config = {"populate_by_name": True}
+
+
+class WalletInfo(BaseModel):
+    """Wallet information in user response."""
+    id: str = Field(..., description="Wallet ID")
+    wallet_number: str = Field(..., description="13-digit wallet number")
+    balance: int = Field(..., description="Wallet balance in kobo")
+    created_at: datetime = Field(..., description="Wallet creation date")
+    
+    model_config = {"from_attributes": True}
 
 
 class UserResponse(BaseModel):
@@ -26,8 +38,18 @@ class UserResponse(BaseModel):
     id: str = Field(..., description="Unique user identifier")
     email: str = Field(..., description="User's email address from Google")
     full_name: Optional[str] = Field(None, description="User's full name from Google profile")
+    wallet: Optional[WalletInfo] = Field(None, description="User's wallet information")
     
     model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    """Complete authentication response with user data."""
+    user: UserResponse = Field(..., description="User information")
+    access_token: str = Field(..., description="JWT access token", alias="accessToken")
+    token_type: str = Field(default="bearer", description="Token type", alias="tokenType")
+    
+    model_config = {"populate_by_name": True}
 
 
 # ============================================================================
@@ -86,6 +108,17 @@ class APIKeyRolloverRequest(BaseModel):
     """Request model for rolling over an expired API key."""
     expired_key_id: str = Field(..., description="ID of the expired key to rollover")
     expiry: ExpiryPeriod = Field(..., description="Expiry period for the new key")
+
+class APIKeyListItem(BaseModel):
+    """Schema for listing API keys (without showing the actual API key)."""
+    id: str = Field(..., description="API key ID")
+    name: str = Field(..., description="User-friendly name of the API key")
+    permissions: List[PermissionType] = Field(..., description="List of permissions granted to this key")
+    expires_at: datetime = Field(..., description="Expiry date of the API key")
+    is_revoked: bool = Field(..., description="Whether the API key has been revoked")
+    created_at: datetime = Field(..., description="Date and time when the key was created")
+    
+    model_config = {"from_attributes": True}
 
 
 # ============================================================================

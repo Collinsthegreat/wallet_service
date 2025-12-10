@@ -79,7 +79,7 @@ class WalletService:
             id=str(uuid.uuid4()),
             user_id=user.id,
             wallet_number=wallet_number,
-            balance=0.0
+            balance=0  # Initialize balance to 0 kobo
         )
         
         db.add(wallet)
@@ -114,7 +114,7 @@ class WalletService:
     def create_pending_deposit(
         db: Session,
         wallet: Wallet,
-        amount: float,
+        amount: int,
         reference: str
     ) -> Transaction:
         """
@@ -126,7 +126,7 @@ class WalletService:
         Args:
             db: Database session
             wallet: Wallet object to deposit into
-            amount: Amount in Naira
+            amount: Amount in kobo
             reference: Unique transaction reference
         
         Returns:
@@ -137,7 +137,7 @@ class WalletService:
             
         Example:
             >>> transaction = WalletService.create_pending_deposit(
-            ...     db, wallet, 500.0, "DEP-unique-123"
+            ...     db, wallet, 50000, "DEP-unique-123"
             ... )
             >>> print(transaction.status)
             TransactionStatus.PENDING
@@ -172,7 +172,7 @@ class WalletService:
         db: Session,
         reference: str,
         status_str: str,
-        amount: float
+        amount: int
     ) -> bool:
         """
         Process deposit webhook and credit wallet (IDEMPOTENT).
@@ -187,7 +187,7 @@ class WalletService:
             db: Database session
             reference: Transaction reference from webhook
             status_str: Status string ("success" or "failed")
-            amount: Amount in Naira (converted from kobo by caller)
+            amount: Amount in kobo
         
         Returns:
             bool: True if transaction was processed, False if already processed
@@ -198,7 +198,7 @@ class WalletService:
         Example:
             >>> # Webhook received
             >>> processed = WalletService.process_webhook_deposit(
-            ...     db, "DEP-123", "success", 500.0
+            ...     db, "DEP-123", "success", 50000
             ... )
             >>> if processed:
             ...     print("Wallet credited")
@@ -249,7 +249,7 @@ class WalletService:
         db: Session,
         sender_wallet: Wallet,
         recipient_wallet_number: str,
-        amount: float
+        amount: int
     ) -> Tuple[Transaction, Transaction]:
         """
         Transfer funds between wallets (ATOMIC operation).
@@ -265,7 +265,7 @@ class WalletService:
             db: Database session
             sender_wallet: Sender's wallet object
             recipient_wallet_number: Recipient's 13-digit wallet number
-            amount: Amount to transfer in Naira
+            amount: Amount to transfer in kobo
         
         Returns:
             tuple: (sender_transaction, recipient_transaction)
@@ -278,7 +278,7 @@ class WalletService:
                 
         Example:
             >>> sender_tx, recipient_tx = WalletService.transfer_funds(
-            ...     db, sender_wallet, "1234567890123", 100.0
+            ...     db, sender_wallet, "1234567890123", 10000
             ... )
             >>> print(sender_tx.type)
             TransactionType.TRANSFER_OUT

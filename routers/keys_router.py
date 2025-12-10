@@ -5,15 +5,16 @@ This module handles:
 - Creating new API keys
 - Rolling over expired API keys
 """
-
+import json 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
-from schemas import APIKeyCreateRequest, APIKeyResponse, APIKeyRolloverRequest
+from models import User, APIKey
+from schemas import APIKeyCreateRequest, APIKeyResponse, APIKeyRolloverRequest, APIKeyListItem
 from dependencies import get_current_user_from_jwt
 from services.api_key_service import api_key_service
+from typing import List 
 
 
 # Initialize router
@@ -136,3 +137,111 @@ def rollover_api_key(
         api_key=new_key,
         expires_at=new_expires_at
     )
+
+
+@router.get("", response_model=List[APIKeyListItem])
+def get_user_api_keys(
+    user: User = Depends(get_current_user_from_jwt),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all API keys for the authenticated user.
+    
+    Requires JWT authentication (Bearer token).
+    Returns both active and revoked keys.
+    
+    Args:
+        user: Authenticated user from JWT token
+        db: Database session
+    
+    Returns:
+        List[APIKeyListItem]: List of user's API keys (without the actual key)
+    
+    Raises:
+        HTTPException:
+            - 401 UNAUTHORIZED: No JWT token provided
+            
+    Example Request:
+        GET /keys
+        Authorization: Bearer eyJ...
+        
+    Example Response:
+        [
+            {
+                "id": "key-uuid-123",
+                "name": "Production Server",
+                "permissions": ["deposit", "read"],
+                "expires_at": "2024-02-10T12:00:00",
+                "is_revoked": false,
+                "created_at": "2024-01-10T12:00:00"
+            }
+        ]
+    """
+    api_keys = db.query(APIKey).filter(APIKey.user_id == user.id).all()
+    
+    # Convert to response format
+    result = []
+    for key in api_keys:
+        result.append(APIKeyListItem(
+            id=key.id,
+            name=key.name,
+            permissions=json.loads(key.permissions),
+            expires_at=key.expires_at,
+            is_revoked=key.is_revoked,
+            created_at=key.created_at
+        ))
+    
+    return result
+
+
+@router.delete("/{id}")
+def revoke_api_key(
+    id: str,
+    user: User = Depends(get_current_user_from_jwt),
+    db: Session = Depends(get_db)
+):
+    """
+    Revoke an API key.
+    
+    Requires JWT authentication (Bearer token).
+    Once revoked, the key cannot be used for authentication.
+    
+    Args:
+        id: API key ID to revoke (path parameter)
+        user: Authenticated user from JWT token
+        db: Database session
+    
+    Returns:
+        dict: Success message
+    
+    Raises:
+        HTTPException:
+            - 401 UNAUTHORIZED: No JWT token provided
+            - 404 NOT_FOUND: Key not found or doesn't belong to user
+            
+    Example Request:
+        DELETE /keys/key-uuid-123
+        Authorization: Bearer eyJ...
+        
+    Example Response:
+        {
+            "message": "API key revoked successfully"
+        }
+    """
+    # Find the API key
+    api_key = db.query(APIKey).filter(
+        APIKey.id == id,
+        APIKey.user_id == user.id
+    ).first()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="API key not found"
+        )
+    
+    # Revoke the key
+    api_key.is_revoked = True
+    db.commit()
+    
+    return {"message": "API key revoked successfully"}
