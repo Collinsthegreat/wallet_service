@@ -18,6 +18,7 @@ from enum import Enum
 class TokenResponse(BaseModel):
     """Response model for OAuth authentication containing JWT token."""
     access_token: str = Field(..., description="JWT access token for authentication", alias="accessToken")
+    accessToken: str = Field(..., alias="access_token")
     token_type: str = Field(default="bearer", description="Token type (always 'bearer')", alias="tokenType")
     
     model_config = {"populate_by_name": True}
