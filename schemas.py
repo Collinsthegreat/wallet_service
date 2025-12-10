@@ -88,6 +88,16 @@ class APIKeyCreateRequest(BaseModel):
         ...,
         description="Expiry period for the key (1H, 1D, 1M, 1Y)"
     )
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "name": "wallet-service",
+                "permissions": ["deposit", "transfer", "read"],
+                "expiry": "1D",
+            }
+        }
+    }
     
     @field_validator('permissions')
     @classmethod
@@ -109,11 +119,12 @@ class APIKeyRolloverRequest(BaseModel):
     expired_key_id: str = Field(..., description="ID of the expired key to rollover")
     expiry: ExpiryPeriod = Field(..., description="Expiry period for the new key")
 
+
 class APIKeyListItem(BaseModel):
     """Schema for listing API keys (without showing the actual API key)."""
     id: str = Field(..., description="API key ID")
     name: str = Field(..., description="User-friendly name of the API key")
-    permissions: List[PermissionType] = Field(..., description="List of permissions granted to this key")
+    permissions: List[str] = Field(..., description="List of permissions granted to this key")
     expires_at: datetime = Field(..., description="Expiry date of the API key")
     is_revoked: bool = Field(..., description="Whether the API key has been revoked")
     created_at: datetime = Field(..., description="Date and time when the key was created")
@@ -127,14 +138,14 @@ class APIKeyListItem(BaseModel):
 
 class WalletDepositRequest(BaseModel):
     """Request model for initiating a deposit via Paystack."""
-    amount: float = Field(..., gt=0, description="Amount to deposit in Naira (must be positive)")
+    amount: int = Field(..., gt=0, description="Amount to deposit in kobo (must be positive integer)", example=5000)
     
     @field_validator('amount')
     @classmethod
-    def validate_amount_reasonable(cls, v: float) -> float:
-        """Ensure amount is reasonable (less than 1 million Naira = 100M kobo)."""
-        if v >= 1_000_000:
-            raise ValueError("Amount must be less than 1,000,000 Naira")
+    def validate_amount_reasonable(cls, v: int) -> int:
+        """Ensure amount is reasonable (less than 100M kobo = 1M Naira)."""
+        if v >= 100_000_000:
+            raise ValueError("Amount must be less than 100,000,000 kobo (1,000,000 Naira)")
         return v
 
 
@@ -148,19 +159,19 @@ class DepositStatusResponse(BaseModel):
     """Response model for checking deposit status."""
     reference: str = Field(..., description="Transaction reference")
     status: Literal["success", "failed", "pending"] = Field(..., description="Current transaction status")
-    amount: float = Field(..., description="Transaction amount in Naira")
+    amount: int = Field(..., description="Transaction amount in kobo")
 
 
 class WalletBalanceResponse(BaseModel):
     """Response model for wallet balance."""
-    balance: float = Field(..., description="Current wallet balance in Naira")
+    balance: int = Field(..., description="Current wallet balance in kobo")
 
 
 class WalletMeResponse(BaseModel):
     """Response model for retrieving the authenticated user's wallet information."""
     id: str = Field(..., description="Wallet ID")
     wallet_number: str = Field(..., description="13-digit wallet number")
-    balance: float = Field(..., description="Current wallet balance in Naira")
+    balance: int = Field(..., description="Current wallet balance in kobo")
     created_at: datetime = Field(..., description="Date and time when the wallet was created")
 
     model_config = {"from_attributes": True}
@@ -172,9 +183,10 @@ class WalletTransferRequest(BaseModel):
         ..., 
         min_length=13, 
         max_length=13,
-        description="Recipient's 13-digit wallet number"
+        description="Recipient's 13-digit wallet number",
+        example="4566674598456"
     )
-    amount: float = Field(..., gt=0, description="Amount to transfer in Naira (must be positive)")
+    amount: int = Field(..., gt=0, description="Amount to transfer in kobo (must be positive integer)", example=10000)
     
     @field_validator('wallet_number')
     @classmethod
@@ -188,12 +200,12 @@ class WalletTransferRequest(BaseModel):
     
     @field_validator('amount')
     @classmethod
-    def validate_transfer_amount(cls, v: float) -> float:
+    def validate_transfer_amount(cls, v: int) -> int:
         """Ensure transfer amount is positive and reasonable."""
         if v <= 0:
             raise ValueError("Transfer amount must be positive")
-        if v >= 1_000_000:
-            raise ValueError("Transfer amount must be less than 1,000,000 Naira")
+        if v >= 100_000_000:
+            raise ValueError("Transfer amount must be less than 100,000,000 kobo (1,000,000 Naira)")
         return v
 
 
@@ -207,13 +219,23 @@ class TransactionResponse(BaseModel):
     """Response model for transaction history."""
     id: str = Field(..., description="Transaction ID")
     type: str = Field(..., description="Transaction type (DEPOSIT, TRANSFER_IN, TRANSFER_OUT)")
-    amount: float = Field(..., description="Transaction amount in Naira")
+    amount: int = Field(..., description="Transaction amount in kobo")
     status: str = Field(..., description="Transaction status (PENDING, SUCCESS, FAILED)")
     reference: str = Field(..., description="Unique transaction reference")
     recipient_wallet_number: Optional[str] = Field(None, description="Recipient wallet number (for transfers)")
     created_at: datetime = Field(..., description="When the transaction was created")
     
     model_config = {"from_attributes": True}
+
+class PaginatedTransactionResponse(BaseModel):
+    """Paginated transaction response with metadata."""
+    data: List[TransactionResponse]
+    meta: dict = Field(..., example={
+        "total": 45,
+        "page": 1,
+        "limit": 20,
+        "totalPages": 3
+    })
 
 
 class WebhookResponse(BaseModel):

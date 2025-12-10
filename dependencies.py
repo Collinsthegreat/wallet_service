@@ -77,7 +77,7 @@ async def get_current_user_from_jwt(
 # ============================================================================
 
 async def get_current_user_from_api_key(
-    x_api_key: Optional[str] = Header(None),
+    x_api_key: Optional[str] = Header(None, include_in_schema=False),
     db: Session = Depends(get_db)
 ) -> Optional[Tuple[User, List[str]]]:
     """

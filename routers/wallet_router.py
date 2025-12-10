@@ -20,7 +20,7 @@ from models import User, Transaction, TransactionType
 from schemas import (
     WalletDepositRequest, WalletDepositResponse, DepositStatusResponse,
     WalletBalanceResponse, WalletMeResponse, WalletTransferRequest, WalletTransferResponse,
-    TransactionResponse, WebhookResponse
+    TransactionResponse, WebhookResponse , PaginatedTransactionResponse
 )
 from dependencies import require_permission
 from services.wallet_service import wallet_service
@@ -423,61 +423,57 @@ def transfer_funds(
     )
 
 
-@router.get("/transactions", response_model=List[TransactionResponse])
+
+@router.get("/transactions", response_model=PaginatedTransactionResponse)
 def get_transaction_history(
+    page: int = 1,
+    limit: int = 20,
     user: User = Depends(require_permission("read")),
     db: Session = Depends(get_db)
 ):
     """
-    Get transaction history for user's wallet.
-    
-    Requires "read" permission (JWT or API key with read permission).
-    
-    Returns all transactions (deposits, transfers in, transfers out)
+    Get paginated transaction history for the authenticated user.
+
+    Returns transactions (deposits, transfers in/out)
     ordered by most recent first.
-    
-    Args:
-        user: Authenticated user
-        db: Database session
-    
-    Returns:
-        List[TransactionResponse]: List of transactions
-        
-    Example Request:
-        GET /wallet/transactions
-        Authorization: Bearer eyJ... (or x-api-key: sk_live_...)
-        
-    Example Response:
-        [
-            {
-                "id": "txn-123",
-                "type": "DEPOSIT",
-                "amount": 50000,
-                "status": "SUCCESS",
-                "reference": "DEP-abc123",
-                "recipient_wallet_number": null,
-                "created_at": "2024-01-10T12:00:00"
-            },
-            {
-                "id": "txn-456",
-                "type": "TRANSFER_OUT",
-                "amount": 10000,
-                "status": "SUCCESS",
-                "reference": "TRF-xyz789-OUT",
-                "recipient_wallet_number": "1234567890123",
-                "created_at": "2024-01-09T15:30:00"
-            }
-        ]
+
+    Query Params:
+        page: Page number (starts at 1)
+        limit: Items per page (1–100)
     """
-    # Get user's wallet
+
+    # Validate pagination params
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Page must be >= 1")
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+
+    # Get the user's wallet
     wallet = wallet_service.get_wallet(db, user)
-    
-    # Query all transactions for this wallet
-    transactions = (
+
+    # Base query
+    query = (
         db.query(Transaction)
         .filter(Transaction.wallet_id == wallet.id)
         .order_by(Transaction.created_at.desc())
-        .all()
     )
-    
-    return transactions
+
+    # Total before pagination
+    total = query.count()
+
+    # Apply pagination
+    offset = (page - 1) * limit
+    transactions = query.offset(offset).limit(limit).all()
+
+    # Convert ORM → Pydantic
+    data = [TransactionResponse.model_validate(t) for t in transactions]
+
+    # Build pagination metadata
+    meta = {
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "totalPages": (total + limit - 1) // limit,  # ceil
+    }
+
+    return PaginatedTransactionResponse(data=data, meta=meta)

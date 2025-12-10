@@ -9,7 +9,7 @@ This module handles:
 """
 
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, status,Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from authlib.integrations.starlette_client import OAuth
@@ -59,7 +59,12 @@ async def google_login(request: Request):
 
 
 @router.get("/google/callback", response_model=AuthResponse)
-async def google_callback(request: Request, db: Session = Depends(get_db)):
+async def google_callback(
+    request: Request,
+    code: str = Query(..., description="Authorization code returned from Google"),
+    db: Session = Depends(get_db)
+):
+
     """
     Handle Google OAuth callback.
     

@@ -53,6 +53,8 @@ def custom_openapi():
             "description": "Enter API key"
         }
     }
+    openapi_schema["security"] = []
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
