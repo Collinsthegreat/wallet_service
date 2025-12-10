@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: wallet-service
+    env: python
+    plan: free
+    pythonVersion: 3.12.17
+    buildCommand: |
+      pip install --upgrade pip setuptools wheel
+      pip install -r requirements.txt
+    startCommand: gunicorn app.main:app --bind 0.0.0.0:10000
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
