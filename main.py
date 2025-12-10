@@ -53,7 +53,10 @@ def custom_openapi():
             "description": "Enter API key"
         }
     }
-    openapi_schema["security"] = []
+    openapi_schema["security"] = [
+    {"bearer": []},
+    {"api-key": []}
+]
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
