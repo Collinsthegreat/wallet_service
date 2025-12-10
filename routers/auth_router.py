@@ -54,7 +54,7 @@ async def google_login(request: Request):
         User is redirected to: https://accounts.google.com/o/oauth2/v2/auth?...
     """
     redirect_uri = settings.GOOGLE_REDIRECT_URI
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    return await oauth.google.authorize_redirect(request, redirect_uri, prompt="select_account")
 
 
 
