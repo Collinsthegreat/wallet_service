@@ -19,7 +19,7 @@ from database import get_db
 from models import User, Transaction, TransactionType
 from schemas import (
     WalletDepositRequest, WalletDepositResponse, DepositStatusResponse,
-    WalletBalanceResponse, WalletTransferRequest, WalletTransferResponse,
+    WalletBalanceResponse, WalletMeResponse, WalletTransferRequest, WalletTransferResponse,
     TransactionResponse, WebhookResponse
 )
 from dependencies import require_permission
@@ -349,6 +349,18 @@ def get_balance(
     """
     wallet = wallet_service.get_wallet(db, user)
     return WalletBalanceResponse(balance=wallet.balance)
+
+@router.get("/me", response_model=WalletMeResponse)
+def get_my_wallet(
+    user: User = Depends(require_permission("read")),
+    db: Session = Depends(get_db)
+):
+    """
+    Return authenticated user's wallet details.
+    Includes wallet ID, wallet number, balance, and created_at.
+    """
+    wallet = wallet_service.get_wallet(db, user)
+    return wallet
 
 
 @router.post("/transfer", response_model=WalletTransferResponse)

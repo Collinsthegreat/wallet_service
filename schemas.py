@@ -156,6 +156,16 @@ class WalletBalanceResponse(BaseModel):
     balance: float = Field(..., description="Current wallet balance in Naira")
 
 
+class WalletMeResponse(BaseModel):
+    """Response model for retrieving the authenticated user's wallet information."""
+    id: str = Field(..., description="Wallet ID")
+    wallet_number: str = Field(..., description="13-digit wallet number")
+    balance: float = Field(..., description="Current wallet balance in Naira")
+    created_at: datetime = Field(..., description="Date and time when the wallet was created")
+
+    model_config = {"from_attributes": True}
+
+
 class WalletTransferRequest(BaseModel):
     """Request model for transferring funds between wallets."""
     wallet_number: str = Field(
