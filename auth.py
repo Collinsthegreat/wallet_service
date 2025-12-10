@@ -210,7 +210,7 @@ def verify_paystack_signature(payload: bytes, signature: str) -> bool:
         bool: True if signature is valid, False otherwise.
     """
     hash_obj = hmac.new(
-        settings.PAYSTACK_WEBHOOK_SECRET.encode('utf-8'),
+        settings.PAYSTACK_SECRET_KEY.encode('utf-8'),
         msg=payload,
         digestmod=hashlib.sha512
     )
