@@ -72,7 +72,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(SessionMiddleware, secret_key=settings.JWT_SECRET_KEY)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.JWT_SECRET_KEY,
+    max_age=3600,      # Session lasts 1 hour
+    same_site="none",  # Needed for cross-site OAuth (Google)
+    https_only=True    # Ensure this is True if your site uses HTTPS
+)
+
 
 # Include routers
 app.include_router(auth_router.router)
