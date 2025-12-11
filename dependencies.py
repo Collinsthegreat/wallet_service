@@ -54,10 +54,10 @@ async def get_current_user_from_jwt(
             return {"user_id": user.id}
     """
     if not credentials:
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="JWT token required"
-    )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="JWT token required"
+        )
     
     # Decode the JWT token
     payload = decode_access_token(credentials.credentials)
