@@ -232,7 +232,7 @@ def require_permission(required_permission: str) -> Callable:
     """
     async def permission_checker(
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-        x_api_key: Optional[str] = Header(None),  # include_in_schema removed
+        x_api_key: Optional[str] = Header(None), alias="x-api-key"),  # include_in_schema removed
         db: Session = Depends(get_db)
     ) -> User:
         # Try JWT first
