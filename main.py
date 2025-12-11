@@ -91,7 +91,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=settings.JWT_SECRET_KEY,
     max_age=3600,      # Session lasts 1 hour
-    same_site="none",  # Needed for cross-site OAuth (Google)
+    same_site="lax",  # Needed for cross-site OAuth (Google)
     https_only=True    # Ensure this is True if your site uses HTTPS
 )
 
