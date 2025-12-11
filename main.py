@@ -46,13 +46,13 @@ def custom_openapi():
         "Bearer": {
             "type": "http",
             "scheme": "bearer",
-            "bearerFormat": "JWT"
+            "bearerFormat": "JWT",
              "description": "Enter JWT token"
         },
         "APIKey": {
             "type": "apiKey",
             "in": "header",
-            "name": "x-api-key"
+            "name": "x-api-key",
             "description": "Enter API key"
         }
     }
