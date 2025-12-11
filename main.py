@@ -43,23 +43,22 @@ def custom_openapi():
     )
 
     openapi_schema["components"]["securitySchemes"] = {
-        "Bearer": {
+        "bearer": { 
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
              "description": "Enter JWT token"
         },
-        "APIKey": {
+        "api-key": { 
             "type": "apiKey",
             "in": "header",
             "name": "x-api-key",
             "description": "Enter API key"
         }
     }
-
     public_paths = [
         "/", 
-        "/auth/google/login",
+        "/auth/google",
         "/auth/google/callback",
         "/wallet/paystack/webhook"
     ]
@@ -69,8 +68,8 @@ def custom_openapi():
             if method in ["get", "post", "put", "delete", "patch"]:
                 if path not in public_paths:
                     operation.setdefault("security", [
-                        {"Bearer": []},
-                        {"APIKey": []}
+                        {"bearer": []},
+                        {"api-Key": []}
                     ])
 
     app.openapi_schema = openapi_schema
