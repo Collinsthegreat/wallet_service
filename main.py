@@ -43,7 +43,7 @@ def custom_openapi():
     )
 
     openapi_schema["components"]["securitySchemes"] = {
-        "bearer": { 
+        "HTTPBearer": { 
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
@@ -68,7 +68,7 @@ def custom_openapi():
             if method in ["get", "post", "put", "delete", "patch"]:
                 if path not in public_paths:
                     operation.setdefault("security", [
-                        {"bearer": []},
+                        {"HTTPBearer": []},
                         {"api-key": []}
                     ])
 
