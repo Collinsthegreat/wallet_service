@@ -322,3 +322,57 @@ def require_permission(required_permission: str) -> Callable:
         )
     
     return permission_checker
+
+# ============================================================================
+# STRICT API KEY ONLY PERMISSION CHECKER  (NO JWT ALLOWED)
+# ============================================================================
+
+from fastapi.security import APIKeyHeader
+from fastapi import Security
+strict_api_key_security = APIKeyHeader(name="x-api-key", auto_error=False, include_in_schema=False)
+
+def require_strict_api_key_permission(required_permission: str) -> Callable:
+    """
+    Enforces API key authentication ONLY.
+    JWTs are rejected for this dependency.
+    """
+
+    async def strict_checker(
+        x_api_key: Optional[str] = Security(strict_api_key_security),
+        db: Session = Depends(get_db)
+    ) -> User:
+
+        # Require API key ONLY — reject JWTs automatically
+        if not x_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key required for this operation"
+            )
+
+        key_hash = hash_api_key(x_api_key)
+        api_key = db.query(APIKey).filter(APIKey.key_hash == key_hash).first()
+
+        if not api_key:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+        if api_key.is_revoked:
+            raise HTTPException(status_code=401, detail="API key has been revoked")
+
+        if datetime.utcnow() > api_key.expires_at:
+            raise HTTPException(status_code=401, detail="API key has expired")
+
+        user = db.query(User).filter(User.id == api_key.user_id).first()
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid API key")
+
+        permissions = json.loads(api_key.permissions)
+        if required_permission not in permissions:
+            raise HTTPException(
+                status_code=403,
+                detail=f"API key lacks required permission: {required_permission}"
+            )
+
+        return user
+
+    return strict_checker
+
