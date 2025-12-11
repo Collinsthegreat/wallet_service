@@ -28,8 +28,6 @@ app = FastAPI(
 )
 
 # Add security schemes for Swagger U
-app.openapi = custom_openapi
-
 from fastapi.openapi.utils import get_openapi
 
 
