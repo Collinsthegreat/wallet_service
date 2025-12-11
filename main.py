@@ -69,11 +69,13 @@ def custom_openapi():
                 if path not in public_paths:
                     operation.setdefault("security", [
                         {"bearer": []},
-                        {"api-Key": []}
+                        {"api-key": []}
                     ])
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
+
+app.openapi = custom_openapi
 
 
 # Add CORS middleware (configure for production)
