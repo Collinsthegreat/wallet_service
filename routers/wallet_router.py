@@ -22,7 +22,7 @@ from schemas import (
     WalletBalanceResponse, WalletMeResponse, WalletTransferRequest, WalletTransferResponse,
     TransactionResponse, WebhookResponse , PaginatedTransactionResponse
 )
-from dependencies import require_permission
+from dependencies import require_permission,require_strict_api_key_permission
 from services.wallet_service import wallet_service
 from services.paystack_service import paystack_service
 from auth import verify_paystack_signature
