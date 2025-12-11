@@ -30,38 +30,52 @@ app = FastAPI(
 # Add security schemes for Swagger UI
 from fastapi.openapi.utils import get_openapi
 
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
+
     openapi_schema = get_openapi(
         title="Wallet Service API",
         version="1.0.0",
         description="A complete wallet service with Paystack integration, JWT authentication, and API keys",
         routes=app.routes,
     )
+
     openapi_schema["components"]["securitySchemes"] = {
-        "bearer": {
+        "Bearer": {
             "type": "http",
             "scheme": "bearer",
-            "bearerFormat": "JWT",
-            "description": "Enter JWT token"
+            "bearerFormat": "JWT"
+             "description": "Enter JWT token"
         },
-        "api-key": {
+        "APIKey": {
             "type": "apiKey",
             "in": "header",
-            "name": "x-api-key",
+            "name": "x-api-key"
             "description": "Enter API key"
         }
     }
-    openapi_schema["security"] = [
-    {"bearer": []},
-    {"api-key": []}
-]
+
+    public_paths = [
+        "/", 
+        "/auth/google/login",
+        "/auth/google/callback",
+        "/wallet/paystack/webhook"
+    ]
+
+    for path, path_item in openapi_schema.get("paths", {}).items():
+        for method, operation in path_item.items():
+            if method in ["get", "post", "put", "delete", "patch"]:
+                if path not in public_paths:
+                    operation.setdefault("security", [
+                        {"Bearer": []},
+                        {"APIKey": []}
+                    ])
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
-app.openapi = custom_openapi
 
 # Add CORS middleware (configure for production)
 app.add_middleware(
