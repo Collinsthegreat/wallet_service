@@ -16,6 +16,11 @@ from database import get_db
 from models import User, APIKey
 from auth import decode_access_token, hash_api_key
 
+import logging
+
+logger = logging.getLogger("auth_debug")
+logger.setLevel(logging.WARNING)
+logging.basicConfig(level=logging.WARNING)
 
 # Security scheme for JWT authentication
 security = HTTPBearer(auto_error=False)
@@ -235,6 +240,13 @@ def require_permission(required_permission: str) -> Callable:
         x_api_key: Optional[str] = Header(None, alias="x-api-key",include_in_schema=False),  # include_in_schema removed
         db: Session = Depends(get_db)
     ) -> User:
+
+         # DEBUG LOG (this is the important part)
+        logger.warning(
+            "Auth Debug -> credentials_present=%s | x_api_key_present=%s",
+            bool(credentials),
+            bool(x_api_key)
+        )
         # Try JWT first
         if credentials:
             try:
