@@ -329,7 +329,7 @@ def require_permission(required_permission: str) -> Callable:
 
 from fastapi.security import APIKeyHeader
 from fastapi import Security
-strict_api_key_security = APIKeyHeader(name="x-api-key", auto_error=False, include_in_schema=False)
+strict_api_key_security = APIKeyHeader(name="x-api-key", auto_error=False)
 
 def require_strict_api_key_permission(required_permission: str) -> Callable:
     """
