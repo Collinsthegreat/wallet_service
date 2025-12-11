@@ -27,8 +27,11 @@ app = FastAPI(
     }
 )
 
-# Add security schemes for Swagger UI
+# Add security schemes for Swagger U
+app.openapi = custom_openapi
+
 from fastapi.openapi.utils import get_openapi
+
 
 def custom_openapi():
     if app.openapi_schema:
@@ -37,41 +40,38 @@ def custom_openapi():
     openapi_schema = get_openapi(
         title="Wallet Service API",
         version="1.0.0",
-        description="A complete wallet service",
+        description="A complete wallet service with Paystack integration, JWT authentication, and API keys",
         routes=app.routes,
     )
 
     openapi_schema["components"]["securitySchemes"] = {
-        "bearer": {
+        "bearer": { 
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
-            "description": "Paste JWT token only (no Bearer prefix)"
+             "description": "Enter JWT token"
         },
-        "api-key": {
+        "api-key": { 
             "type": "apiKey",
             "in": "header",
             "name": "x-api-key",
-            "description": "Optional"
+            "description": "Enter API key"
         }
     }
-
-    public_paths = {
-        "/",
+    public_paths = [
+        "/", 
         "/auth/google",
         "/auth/google/callback",
         "/wallet/paystack/webhook"
-    }
+    ]
 
     for path, path_item in openapi_schema.get("paths", {}).items():
         for method, operation in path_item.items():
-            if method in ["get","post","put","delete","patch"]:
-                if path in public_paths:
-                    operation.pop("security", None)
-                else:
+            if method in ["get", "post", "put", "delete", "patch"]:
+                if path not in public_paths:
                     operation.setdefault("security", [
                         {"bearer": []},
-                        {"api-key": []},
+                        {"api-key": []}
                     ])
 
     app.openapi_schema = openapi_schema
