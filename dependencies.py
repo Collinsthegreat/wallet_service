@@ -77,7 +77,7 @@ async def get_current_user_from_jwt(
 # ============================================================================
 
 async def get_current_user_from_api_key(
-    x_api_key: Optional[str] = Header(None, include_in_schema=False),
+    x_api_key: Optional[str] = Header(None, alias="x-api-key", include_in_schema=False),
     db: Session = Depends(get_db)
 ) -> Optional[Tuple[User, List[str]]]:
     """
@@ -232,7 +232,7 @@ def require_permission(required_permission: str) -> Callable:
     """
     async def permission_checker(
         credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-        x_api_key: Optional[str] = Header(None), alias="x-api-key"),  # include_in_schema removed
+        x_api_key: Optional[str] = Header(None, alias="x-api-key",include_in_schema=False),  # include_in_schema removed
         db: Session = Depends(get_db)
     ) -> User:
         # Try JWT first
