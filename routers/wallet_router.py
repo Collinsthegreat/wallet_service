@@ -35,7 +35,7 @@ router = APIRouter(prefix="/wallet", tags=["Wallet"])
 @router.post("/deposit", response_model=WalletDepositResponse)
 async def initialize_deposit(
     request: WalletDepositRequest,
-    user: User = Depends(require_permission("deposit")),
+    user: User = Depends(require_strict_api_key_permission("deposit")),
     db: Session = Depends(get_db)
 ):
     """
@@ -366,7 +366,7 @@ def get_my_wallet(
 @router.post("/transfer", response_model=WalletTransferResponse)
 def transfer_funds(
     request: WalletTransferRequest,
-    user: User = Depends(require_permission("transfer")),
+    user: User = Depends(require_strict_api_key_permission("transfer")),
     db: Session = Depends(get_db)
 ):
     """
